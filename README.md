@@ -1,73 +1,162 @@
-# WebFlow: Escaner de Vulnerabilidades Web 🕵️‍♀️
+# tool-webflow
 
-Este es un script Python para escanear vulnerabilidades web que permite descubrir URLs en un sitio web, escanear para vulnerabilidades como inyección SQL e XSS, y proporcionar instrucciones sobre cómo explotar manualmente las vulnerabilidades.
+Escáner básico de vulnerabilidades web escrito en Python.
 
-## Características principales 🔍
+`webflow` realiza:
 
-- Descubrimiento de URLs en un sitio web y numeración de éstas 📊
-- Escaneo de URLs descubiertas para vulnerabilidades como SQL injection e XSS ⚠️
-- Instrucciones detalladas sobre el ataque de vulnerabilidades 💡
-- Apertura automática del navegador para fácil explotación 🌐
+- descubrimiento de URLs internas a partir de una URL inicial,
+- pruebas heurísticas de XSS reflejado,
+- pruebas heurísticas de inyección SQL,
+- revisión de cabeceras de seguridad HTTP.
 
-## Requisitos 💻
+Pensado como **primer filtro ofensivo** para bug bounty y pentesting, no como sustituto de un análisis manual completo.
 
-- Python 3.x
-- Biblioteca requests
-- lxml
-- urllib
-- tqdm
-- string
-- time
-- subprocess
+---
 
-## Instalación 🔧
+## Características
 
-1. Clona el repositorio:
-```bash
-git clone https://github.com/theoffsecgirl/webflow.git
-```
+- Crawling ligero del sitio (profundidad configurable).
+- Detección de parámetros en la query string.
+- Payloads básicos de XSS.
+- Payloads típicos de SQLi con detección por:
+  - cambios de código de estado,
+  - diferencias de tamaño de respuesta,
+  - mensajes de error de base de datos.
+- Revisión de cabeceras de seguridad:
+  - `Content-Security-Policy`
+  - `X-Frame-Options`
+  - `X-Content-Type-Options`
+  - `Referrer-Policy`
+  - `Strict-Transport-Security`
+- Posibilidad de desactivar XSS / SQLi / headers según necesidad.
+- Exportación de resultados a JSON.
 
-2. Cambia al directorio del proyecto:
+---
 
-```bash
-cd webflow
-```
+## Requisitos
 
-3. Instala las dependencias requeridas:
-
-```bash
-pip install -r requirements.txt
-go get -v github.com/projectdiscovery/subfinder/cmd/subfinder
-go get -v github.com/projectdiscovery/httpx/cmd/httpx
-```
-
-## Uso 🖥️
-https://www.example.com/
-Ejecuta el script con el siguiente comando:
+- Python 3.8 o superior
+- Librerías de Python:
 
 ```bash
-pyhton3 webflow.py https://www.example.com
+pip install requests lxml termcolor tqdm
 ```
 
-Sustituye `https://www.example.com` con la URL del sitio web objetivo que deseas escanear para vulnerabilidades.
+---
 
-## Funcionalidades 🛠️
+## Instalación
 
-- Análisis de vulnerabilidades en URL 🔍
-- Reconocimiento de subdominios 👀
-- Escaneo de puertos ⚡
-- Ataques de inyección SQL condicional y basados en tiempo 💻
-- Verificación de encabezados HTTP 🌐
-- Bypass de WAF 🕷️
+```bash
+git clone https://github.com/theoffsecgirl/tool-webflow.git
+cd tool-webflow
+chmod +x tool-webflow.py
+```
 
-## Limitaciones ⚠️
+Puedes renombrarlo si lo prefieres:
 
-Este script es solo una herramienta básica y puede requerir ajustes adicionales para adaptarse a tu caso de uso específico. El testing de seguridad web es una tarea compleja, por lo que este script debe ser solo una parte de una estrategia de testing de seguridad integral.
+```bash
+mv tool-webflow.py webflow.py
+chmod +x webflow.py
+```
 
-## Aviso Legal 🚫
+---
 
-Por favor, asegúrate de tener autorización adecuada antes de realizar cualquier prueba de vulnerabilidad. Usa esta herramienta responsablemente y solo para fines educativos. No somos responsables de ningún uso indebido o actividades ilegales.
+## Uso básico
 
-## Contribuciones 🤝
+### Escaneo rápido
 
-Las contribuciones son bienvenidas! Si tienes sugerencias, mejoras o nuevas características para agregar, por favor abre una solicitud de incorporación de cambios o envía una solicitud de extracción.
+```bash
+python3 tool-webflow.py -u https://example.com
+```
+
+Esto:
+
+- descubre URLs internas hasta profundidad 1,
+- prueba XSS y SQLi en aquellas que tengan parámetros,
+- revisa cabeceras de seguridad.
+
+### Cambiar profundidad de crawling
+
+```bash
+python3 tool-webflow.py -u https://example.com -d 2
+```
+
+### Desactivar ciertos checks
+
+```bash
+# Solo cabeceras de seguridad
+python3 tool-webflow.py -u https://example.com --no-xss --no-sqli
+
+# Solo XSS
+python3 tool-webflow.py -u https://example.com --no-sqli --no-headers
+```
+
+### Exportar resultados a JSON
+
+```bash
+python3 tool-webflow.py -u https://example.com --json-output resultados_webflow.json
+```
+
+---
+
+## Interpretación de resultados
+
+Ejemplo de detección de XSS:
+
+```text
+[!] Posible XSS en https://example.com/search?q=... parámetro 'q' con payload '<script>alert(1)</script>'
+```
+
+Ejemplo de posible SQLi:
+
+```text
+[!] Posible SQLi en https://example.com/item?id=... parámetro 'id' con payload '' OR 1=1-- - (status 500)
+```
+
+Cabeceras de seguridad ausentes:
+
+```text
+[!] Cabeceras de seguridad ausentes en https://example.com: Content-Security-Policy, X-Frame-Options
+```
+
+Recuerda que el script utiliza **heurísticas**. Todo hallazgo debe ser validado manualmente.
+
+---
+
+## Limitaciones
+
+- No realiza autenticación ni gestión avanzada de sesión.
+- No soporta formularios POST ni cuerpos complejos (solo parámetros en URL).
+- Las detecciones de XSS y SQLi son básicas y pueden producir falsos positivos o negativos.
+- No hace bypass de WAF ni payloads evasivos.
+
+`tool-webflow` está diseñado como herramienta rápida para apoyar el reconocimiento ofensivo, no como un escáner completo.
+
+---
+
+##  Uso ético
+
+Utiliza esta herramienta únicamente en:
+
+- sistemas propios,
+- laboratorios,
+- o programas de bug bounty donde tengas autorización.
+
+El uso indebido puede ser ilegal y es responsabilidad exclusiva del usuario.
+
+---
+
+## Licencia
+
+Este proyecto está bajo licencia **MIT**.  
+Consulta el archivo `LICENSE` para más detalles.
+
+---
+
+## Autora
+
+Desarrollado por **TheOffSecGirl**
+
+- GitHub: https://github.com/theoffsecgirl
+- Web técnica: https://www.theoffsecgirl.com
+- Academia: https://www.northstaracademy.io
