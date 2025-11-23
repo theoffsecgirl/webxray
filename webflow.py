@@ -64,7 +64,7 @@ def log_error(msg: str):
 
 
 def normalize_url(base: str) -> str:
-    if not base.startswith(("http://", "https://"))):
+    if not base.startswith(("http://", "https://")):
         base = "https://" + base
     return base.rstrip("/")
 
