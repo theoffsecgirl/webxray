@@ -1,5 +1,5 @@
-# requirements.txt
-requests==2.26.0
-lxml==4.9.1
-tqdm==4.64.0
-termcolor==1.1.0
+requests>=2.31.0
+aiohttp>=3.9.0
+lxml>=5.1.0
+colorama>=0.4.6
+tqdm>=4.66.0
