@@ -150,13 +150,3 @@ El uso indebido puede ser ilegal y es responsabilidad exclusiva del usuario.
 
 Este proyecto está bajo licencia **MIT**.  
 Consulta el archivo `LICENSE` para más detalles.
-
----
-
-## Autora
-
-Desarrollado por **TheOffSecGirl**
-
-- GitHub: https://github.com/theoffsecgirl
-- Web técnica: https://www.theoffsecgirl.com
-- Academia: https://www.northstaracademy.io
