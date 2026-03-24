@@ -1,46 +1,44 @@
-# tool-webflow
+<div align="center">
 
-Escáner básico de vulnerabilidades web escrito en Python.
-
-`webflow` realiza:
-
-- descubrimiento de URLs internas a partir de una URL inicial,
-- pruebas heurísticas de XSS reflejado,
-- pruebas heurísticas de inyección SQL,
-- revisión de cabeceras de seguridad HTTP.
-
-Pensado como **primer filtro ofensivo** para bug bounty y pentesting, no como sustituto de un análisis manual completo.
-
----
-
-## Características
-
-- Crawling ligero del sitio (profundidad configurable).
-- Detección de parámetros en la query string.
-- Payloads básicos de XSS.
-- Payloads típicos de SQLi con detección por:
-  - cambios de código de estado,
-  - diferencias de tamaño de respuesta,
-  - mensajes de error de base de datos.
-- Revisión de cabeceras de seguridad:
-  - `Content-Security-Policy`
-  - `X-Frame-Options`
-  - `X-Content-Type-Options`
-  - `Referrer-Policy`
-  - `Strict-Transport-Security`
-- Posibilidad de desactivar XSS / SQLi / headers según necesidad.
-- Exportación de resultados a JSON.
-
----
-
-## Requisitos
-
-- Python 3.8 o superior
-- Librerías de Python:
-
-```bash
-pip install requests lxml termcolor tqdm
 ```
+ ██╗    ██╗███████╗██████╗ ███████╗██╗      ██████╗ ██╗    ██╗
+ ██║    ██║██╔════╝██╔══██╗██╔════╝██║     ██╔═══██╗██║    ██║
+ ██║ █╗ ██║█████╗  ██████╔╝█████╗  ██║     ██║   ██║██║ █╗ ██║
+ ██║███╗██║██╔══╝  ██╔══██╗██╔══╝  ██║     ██║   ██║██║███╗██║
+ ╚███╔███╔╝███████╗██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝
+  ╚══╝╚══╝ ╚══════╝╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝
+```
+
+**Escáner ofensivo de vulnerabilidades web**  
+*by [TheOffSecGirl](https://github.com/theoffsecgirl)*
+
+![Python](https://img.shields.io/badge/Python-3.8%2B-brightgreen?style=flat-square&logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-red?style=flat-square)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey?style=flat-square)
+![BugBounty](https://img.shields.io/badge/Bug%20Bounty-Ready-brightgreen?style=flat-square)
+
+</div>
+
+---
+
+## ¿Qué es tool-webflow?
+
+`tool-webflow` es un escáner ofensivo en Python diseñado como **primer filtro rápido** para bug bounty y pentesting web. Combina crawling ligero, detección de vulnerabilidades comunes y — con el flag `--waf-xss` — detección de WAF con payloads específicos de bypass.
+
+---
+
+## Funcionalidades
+
+| Módulo | Descripción |
+|--------|-------------|
+| 🕷️ Crawling | Descubrimiento de URLs internas con profundidad configurable |
+| 🔥 XSS | Payloads básicos reflejados sobre parámetros de URL |
+| 💉 SQLi | Heurísticas por código de estado, tamaño de respuesta y errores DB |
+| 🔒 Headers | Revisión de cabeceras de seguridad HTTP ausentes |
+| 🛡️ WAF + XSS | Detección de WAF + payloads bypass específicos por proveedor |
+
+**WAFs soportados en modo `--waf-xss`:**  
+Akamai · Cloudflare · CloudFront · ModSecurity · Imperva · Sucuri
 
 ---
 
@@ -49,104 +47,93 @@ pip install requests lxml termcolor tqdm
 ```bash
 git clone https://github.com/theoffsecgirl/tool-webflow.git
 cd tool-webflow
-chmod +x tool-webflow.py
+pip install -r requirements.txt
 ```
 
-Puedes renombrarlo si lo prefieres:
-
-```bash
-mv tool-webflow.py webflow.py
-chmod +x webflow.py
-```
+> El modo `--waf-xss` requiere además: `pip install wafw00f`
 
 ---
 
-## Uso básico
+## Uso
 
-### Escaneo rápido
+### Escaneo estándar
 
 ```bash
-python3 tool-webflow.py -u https://example.com
+python3 webflow.py -u https://example.com
 ```
-
-Esto:
-
-- descubre URLs internas hasta profundidad 1,
-- prueba XSS y SQLi en aquellas que tengan parámetros,
-- revisa cabeceras de seguridad.
 
 ### Cambiar profundidad de crawling
 
 ```bash
-python3 tool-webflow.py -u https://example.com -d 2
+python3 webflow.py -u https://example.com -d 2
 ```
 
-### Desactivar ciertos checks
+### Solo XSS (sin SQLi ni headers)
 
 ```bash
-# Solo cabeceras de seguridad
-python3 tool-webflow.py -u https://example.com --no-xss --no-sqli
-
-# Solo XSS
-python3 tool-webflow.py -u https://example.com --no-sqli --no-headers
+python3 webflow.py -u https://example.com --no-sqli --no-headers
 ```
 
-### Exportar resultados a JSON
+### Modo WAF + XSS avanzado
 
 ```bash
-python3 tool-webflow.py -u https://example.com --json-output resultados_webflow.json
+python3 webflow.py -u https://example.com --waf-xss
+```
+
+Este modo:
+1. Detecta el WAF presente (via `wafw00f`).
+2. Selecciona payloads XSS específicos de bypass para ese WAF.
+3. Prueba parámetros URL **y** formularios HTML.
+
+Ejemplo de salida:
+
+```text
+[+] tool-webflow – Web scanner by TheOffSecGirl
+[+] Iniciando modo WAF + XSS avanzado...
+[!] WAF detectado: Cloudflare
+[+] Usando payloads específicos para cloudflare.
+[!] [WAF-XSS] Posible XSS en 'q' con payload: <Svg Only=1 OnLoad=confirm(document.cookie)>
+[+] Escaneo completado. Hallazgos totales: 1
+```
+
+### Exportar a JSON
+
+```bash
+python3 webflow.py -u https://example.com --json-output resultados.json
 ```
 
 ---
 
-## Interpretación de resultados
+## Flags disponibles
 
-Ejemplo de detección de XSS:
-
-```text
-[!] Posible XSS en https://example.com/search?q=... parámetro 'q' con payload '<script>alert(1)</script>'
-```
-
-Ejemplo de posible SQLi:
-
-```text
-[!] Posible SQLi en https://example.com/item?id=... parámetro 'id' con payload '' OR 1=1-- - (status 500)
-```
-
-Cabeceras de seguridad ausentes:
-
-```text
-[!] Cabeceras de seguridad ausentes en https://example.com: Content-Security-Policy, X-Frame-Options
-```
-
-Recuerda que el script utiliza **heurísticas**. Todo hallazgo debe ser validado manualmente.
+| Flag | Descripción |
+|------|-------------|
+| `-u`, `--url` | URL objetivo (**requerido**) |
+| `-d`, `--depth` | Profundidad de crawling (default: 1) |
+| `--no-xss` | Deshabilitar XSS básico |
+| `--no-sqli` | Deshabilitar SQLi |
+| `--no-headers` | Deshabilitar revisión de headers |
+| `--waf-xss` | Activar modo WAF + XSS avanzado |
+| `-t`, `--timeout` | Timeout HTTP en segundos (default: 10) |
+| `--json-output` | Exportar hallazgos a JSON |
 
 ---
 
 ## Limitaciones
 
-- No realiza autenticación ni gestión avanzada de sesión.
-- No soporta formularios POST ni cuerpos complejos (solo parámetros en URL).
-- Las detecciones de XSS y SQLi son básicas y pueden producir falsos positivos o negativos.
-- No hace bypass de WAF ni payloads evasivos.
-
-`tool-webflow` está diseñado como herramienta rápida para apoyar el reconocimiento ofensivo, no como un escáner completo.
+- No gestiona autenticación ni sesiones complejas.
+- Las detecciones son heurísticas → validar manualmente todo hallazgo.
+- El modo `--waf-xss` requiere `wafw00f` instalado en el sistema.
 
 ---
 
-##  Uso ético
+## Uso ético
 
-Utiliza esta herramienta únicamente en:
-
-- sistemas propios,
-- laboratorios,
-- o programas de bug bounty donde tengas autorización.
-
-El uso indebido puede ser ilegal y es responsabilidad exclusiva del usuario.
+> Usa esta herramienta **solo en sistemas propios, laboratorios o programas de bug bounty con autorización explícita.**  
+> El uso indebido puede ser ilegal y es responsabilidad exclusiva del usuario.
 
 ---
 
 ## Licencia
 
-Este proyecto está bajo licencia **MIT**.  
-Consulta el archivo `LICENSE` para más detalles.
+MIT · [TheOffSecGirl](https://theoffsecgirl.com)
