@@ -2,7 +2,7 @@
 
 # webxray
 
-**Offensive web scanner: crawling, XSS, SQLi, headers and WAF bypass**
+**Escáner ofensivo web: crawling, XSS, SQLi, headers y WAF bypass**
 
 ![Language](https://img.shields.io/badge/Python-3.8+-9E4AFF?style=flat-square&logo=python&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.1.0-9E4AFF?style=flat-square)
@@ -11,7 +11,7 @@
 
 *by [theoffsecgirl](https://github.com/theoffsecgirl)*
 
-> 🇪🇸 [Versión en español](README.es.md)
+> 🇬🇧 [English version](README.md)
 
 </div>
 
@@ -33,24 +33,24 @@
 
 ---
 
-## What does it do?
+## ¿Qué hace?
 
-Offensive web scanner written in Python that combines crawling, XSS detection, SQL injection, security header analysis and WAF detection with provider-based bypass. Built for bug bounty and web pentesting.
-
----
-
-## Features
-
-- Application crawling
-- Reflected XSS detection (GET and forms)
-- SQLi detection via GET and POST forms
-- Security header analysis (6 headers)
-- WAF detection and provider-based bypass (`--waf-xss`)
-- JSON export of results
+Escáner ofensivo web escrito en Python que combina crawling, detección de XSS, inyección SQL, análisis de cabeceras de seguridad y detección de WAF con bypass por proveedor. Pensado para bug bounty y pentesting web.
 
 ---
 
-## Installation
+## Funcionalidades
+
+- Crawling de la aplicación objetivo
+- Detección de XSS reflected (GET y formularios)
+- Detección de SQLi GET y POST en formularios
+- Análisis de cabeceras de seguridad (6 cabeceras)
+- Detección de WAF y bypass por proveedor (`--waf-xss`)
+- Exportación de resultados a JSON
+
+---
+
+## Instalación
 
 ```bash
 git clone https://github.com/theoffsecgirl/webxray.git
@@ -60,49 +60,49 @@ pip install -r requirements.txt
 
 ---
 
-## Usage
+## Uso
 
 ```bash
-# Basic scan
+# Escaneo básico
 python3 webxray.py -u https://example.com
 
-# Crawling depth
+# Profundidad de crawling
 python3 webxray.py -u https://example.com -d 2
 
-# With WAF bypass
+# Con bypass WAF
 python3 webxray.py -u https://example.com --waf-xss
 
-# Export results
-python3 webxray.py -u https://example.com --json-output results.json
+# Exportar resultados
+python3 webxray.py -u https://example.com --json-output resultados.json
 
-# Show version
+# Ver versión
 python3 webxray.py --version
 ```
 
 ---
 
-## Parameters
+## Parámetros
 
 ```text
--u, --url          Target URL
--d, --depth        Crawling depth (default: 1)
---no-xss           Skip XSS detection
---no-sqli          Skip SQLi detection
---no-headers       Skip header analysis
---waf-xss          Advanced WAF + XSS mode (requires wafw00f)
--t, --timeout      Timeout in seconds (default: 10)
---json-output      Save results to JSON
-    --version      Show version
+-u, --url          URL objetivo
+-d, --depth        Profundidad de crawling (default: 1)
+--no-xss           Omitir XSS
+--no-sqli          Omitir SQLi
+--no-headers       Omitir cabeceras
+--waf-xss          Modo WAF + XSS avanzado (requiere wafw00f)
+-t, --timeout      Timeout en segundos (default: 10)
+--json-output      Guardar resultados en JSON
+    --version      Muestra la versión
 ```
 
 ---
 
-## Ethical use
+## Uso ético
 
-For bug bounty, labs and authorized audits only.
+Solo para bug bounty, laboratorios y auditorías autorizadas.
 
 ---
 
-## License
+## Licencia
 
 MIT · [theoffsecgirl](https://theoffsecgirl.com)
