@@ -7,12 +7,12 @@
 - Prueba XSS y SQLi sobre parametros GET y formularios POST.
 - Revisa cabeceras de seguridad HTTP.
 - Modo --waf-xss: detecta WAF y lanza payloads XSS especificos por WAF.
-- Salida opcional en JSON.
+- Salida opcional en JSON/JSONL.
 
 Pensado para recon / bug bounty como primer filtro rapido.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import argparse
 import json
@@ -30,7 +30,7 @@ from tqdm import tqdm
 
 
 # Banner
-def print_banner():
+def print_banner() -> None:
     banner = r"""
 +------------------------------------------------------+
 |                                                      |
@@ -44,7 +44,7 @@ def print_banner():
 |  offensive web scanner  v{ver}  by theoffsecgirl  |
 +------------------------------------------------------+
 """.format(ver=__version__)
-    print(colored(banner, "magenta"))
+    print(colored(banner, "magenta"), file=sys.stderr)
 
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -123,15 +123,15 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def log_info(msg: str) -> None:
-    print(colored("[+] {}".format(msg), "green"))
+    print(colored("[+] {}".format(msg), "green"), file=sys.stderr)
 
 
 def log_warn(msg: str) -> None:
-    print(colored("[!] {}".format(msg), "yellow"))
+    print(colored("[!] {}".format(msg), "yellow"), file=sys.stderr)
 
 
 def log_error(msg: str) -> None:
-    print(colored("[x] {}".format(msg), "red"))
+    print(colored("[x] {}".format(msg), "red"), file=sys.stderr)
 
 
 def normalize_url(base: str) -> str:
@@ -144,6 +144,85 @@ def same_host(start_url: str, candidate: str) -> bool:
     a = urlparse(start_url)
     b = urlparse(candidate)
     return a.netloc == b.netloc or b.netloc == ""
+
+
+def normalize_finding(finding: dict) -> dict:
+    parsed = urlparse(finding.get("url", ""))
+    host = parsed.netloc
+    finding_type = finding.get("type", "unknown")
+
+    normalized = {
+        "type": "candidate",
+        "vector": None,
+        "target": finding.get("url"),
+        "host": host,
+        "method": "GET",
+        "param": finding.get("parameter"),
+        "severity": "medium",
+        "confidence": "medium",
+        "evidence": [],
+        "tags": [],
+        "raw": finding,
+    }
+
+    if finding_type == "xss":
+        normalized["vector"] = "xss"
+        normalized["evidence"] = ["payload reflected in response"]
+        normalized["tags"] = ["reflection", "get-param"]
+    elif finding_type == "sqli_get":
+        normalized["vector"] = "sqli"
+        normalized["evidence"] = ["sql error keyword or response diff detected"]
+        normalized["tags"] = ["get-param", "candidate"]
+        normalized["severity"] = "high"
+    elif finding_type == "sqli_post":
+        normalized["vector"] = "sqli"
+        normalized["method"] = "POST"
+        normalized["evidence"] = ["sql error keyword or response diff detected"]
+        normalized["tags"] = ["post-form", "candidate"]
+        normalized["severity"] = "high"
+    elif finding_type == "missing_header":
+        normalized["type"] = "header_issue"
+        normalized["vector"] = "headers"
+        normalized["severity"] = "low"
+        normalized["confidence"] = "high"
+        normalized["evidence"] = ["missing security header: {}".format(finding.get("header"))]
+        normalized["tags"] = ["header-missing"]
+        normalized["param"] = None
+    elif finding_type == "waf_xss":
+        normalized["vector"] = "xss"
+        normalized["evidence"] = ["waf-oriented payload reflected in response"]
+        normalized["tags"] = ["waf-bypass", "get-param"]
+        normalized["raw"]["waf"] = finding.get("waf")
+    elif finding_type == "waf_xss_form":
+        normalized["vector"] = "xss"
+        normalized["method"] = "POST"
+        normalized["evidence"] = ["waf-oriented payload reflected in form response"]
+        normalized["tags"] = ["waf-bypass", "form"]
+        normalized["raw"]["waf"] = finding.get("waf")
+    else:
+        normalized["vector"] = finding_type
+        normalized["confidence"] = "low"
+        normalized["evidence"] = ["generic finding"]
+
+    return normalized
+
+
+def serialize_findings(findings: List[dict], fmt: str) -> str:
+    if fmt == "jsonl":
+        return "\n".join(json.dumps(f, ensure_ascii=False) for f in findings)
+    return json.dumps(findings, indent=2, ensure_ascii=False)
+
+
+def write_output(findings: List[dict], fmt: str, stdout: bool = False, output_file: Optional[str] = None) -> None:
+    payload = serialize_findings(findings, fmt)
+
+    if stdout or output_file == "-":
+        print(payload)
+
+    if output_file and output_file != "-":
+        with open(output_file, "w", encoding="utf-8") as fout:
+            fout.write(payload)
+        log_info("Resultados guardados en {}".format(output_file))
 
 
 # ─── Crawling ────────────────────────────────────────────────────────────────
@@ -229,7 +308,7 @@ def _sqli_hit(r: requests.Response, baseline: Optional[Tuple[int, int]]) -> bool
     error_kw = any(e in r.text.lower() for e in SQLI_ERROR_KW)
     if baseline:
         status_changed = r.status_code != baseline[0]
-        size_changed   = abs(len(r.text) - baseline[1]) > 200
+        size_changed = abs(len(r.text) - baseline[1]) > 200
         return status_changed or size_changed or error_kw
     return error_kw
 
@@ -238,7 +317,6 @@ def check_sqli(session: requests.Session, url: str, timeout: int) -> List[dict]:
     """Prueba SQLi en parametros GET y en formularios POST."""
     findings: List[dict] = []
 
-    # --- GET params ---
     params = extract_params(url)
     baseline: Optional[Tuple[int, int]] = None
     try:
@@ -265,7 +343,6 @@ def check_sqli(session: requests.Session, url: str, timeout: int) -> List[dict]:
                 })
                 break
 
-    # --- POST forms ---
     forms = extract_forms(url, timeout=timeout)
     for form in forms:
         if form["method"] != "post":
@@ -400,7 +477,7 @@ def check_waf_xss(url: str, timeout: int) -> List[dict]:
     forms = extract_forms(url, timeout=timeout)
     for form in forms:
         form_url = form["url"]
-        method   = form["method"]
+        method = form["method"]
         for input_name in form["inputs"]:
             for payload in payloads:
                 data = {input_name: payload}
@@ -435,14 +512,18 @@ def parse_args() -> argparse.Namespace:
                         help="URL objetivo (ej: https://example.com)")
     parser.add_argument("-d", "--depth", type=int, default=1,
                         help="Profundidad de crawling (default: 1)")
-    parser.add_argument("--no-xss",     action="store_true", help="Omitir XSS basico")
-    parser.add_argument("--no-sqli",    action="store_true", help="Omitir SQLi")
+    parser.add_argument("--no-xss", action="store_true", help="Omitir XSS basico")
+    parser.add_argument("--no-sqli", action="store_true", help="Omitir SQLi")
     parser.add_argument("--no-headers", action="store_true", help="Omitir cabeceras")
-    parser.add_argument("--waf-xss",    action="store_true",
+    parser.add_argument("--waf-xss", action="store_true",
                         help="Modo WAF + XSS avanzado (requiere wafw00f)")
     parser.add_argument("-t", "--timeout", type=int, default=10,
                         help="Timeout en segundos (default: 10)")
-    parser.add_argument("--json-output", help="Guardar resultados en JSON")
+    parser.add_argument("--json-output", help="Guardar resultados en JSON/JSONL")
+    parser.add_argument("--format", choices=["json", "jsonl"], default="json",
+                        help="Formato de salida para export y stdout")
+    parser.add_argument("--stdout", action="store_true",
+                        help="Enviar findings normalizados a stdout")
     parser.add_argument("-v", "--version", action="version",
                         version="webxray {}".format(__version__))
     return parser.parse_args()
@@ -455,7 +536,7 @@ def main() -> None:
     args = parse_args()
 
     start_url = normalize_url(args.url)
-    timeout   = args.timeout
+    timeout = args.timeout
     all_findings: List[dict] = []
 
     if args.waf_xss:
@@ -468,7 +549,7 @@ def main() -> None:
         session = requests.Session()
         session.headers.update(DEFAULT_HEADERS)
 
-        for u in tqdm(urls, desc="Escaneando", unit="url"):
+        for u in tqdm(urls, desc="Escaneando", unit="url", file=sys.stderr):
             if not args.no_xss:
                 all_findings.extend(check_xss(session, u, timeout=timeout))
             if not args.no_sqli:
@@ -479,22 +560,27 @@ def main() -> None:
     log_info("Escaneo completado. Hallazgos: {}".format(len(all_findings)))
 
     resumen: Dict[str, int] = {}
-    for f in all_findings:
-        resumen[f["type"]] = resumen.get(f["type"], 0) + 1
+    for finding in all_findings:
+        resumen[finding["type"]] = resumen.get(finding["type"], 0) + 1
     if resumen:
         log_info("Resumen por tipo:")
         for tipo, count in resumen.items():
-            print("  - {}: {}".format(tipo, count))
+            print("  - {}: {}".format(tipo, count), file=sys.stderr)
     else:
         log_info("Sin hallazgos con las heuristicas usadas.")
 
-    if args.json_output:
+    normalized_findings = [normalize_finding(f) for f in all_findings]
+
+    if args.json_output or args.stdout:
         try:
-            with open(args.json_output, "w", encoding="utf-8") as fout:
-                json.dump(all_findings, fout, indent=2, ensure_ascii=False)
-            log_info("Resultados guardados en {}".format(args.json_output))
+            write_output(
+                normalized_findings,
+                fmt=args.format,
+                stdout=args.stdout,
+                output_file=args.json_output,
+            )
         except OSError as e:
-            log_error("No se pudo escribir JSON: {}".format(e))
+            log_error("No se pudo escribir salida: {}".format(e))
 
 
 if __name__ == "__main__":
