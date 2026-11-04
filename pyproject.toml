@@ -39,3 +39,7 @@ Repository = "https://github.com/theoffsecgirl/webxray"
 [tool.ruff]
 line-length = 120
 target-version = "py38"
+
+[tool.ruff.lint]
+# Reglas explícitas: evita que una versión nueva de ruff cambie el set por defecto y rompa la CI.
+select = ["E", "F", "W", "I", "UP", "B"]
