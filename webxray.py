@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """webxray – escaner ofensivo de vulnerabilidades web.
 
@@ -23,7 +22,7 @@ import subprocess
 import sys
 from html import escape as html_escape
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import urljoin, urlparse, parse_qsl, urlencode, urlunparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,9 +30,8 @@ from lxml import html
 from termcolor import colored
 from tqdm import tqdm
 
-
 DEFAULT_HEADERS: Dict[str, str] = {
-    "User-Agent": "Mozilla/5.0 (compatible; webxray/{} by theoffsecgirl)".format(__version__),
+    "User-Agent": f"Mozilla/5.0 (compatible; webxray/{__version__} by theoffsecgirl)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
@@ -118,15 +116,15 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def log_info(msg: str) -> None:
-    print(colored("[+] {}".format(msg), "green"), file=sys.stderr)
+    print(colored(f"[+] {msg}", "green"), file=sys.stderr)
 
 
 def log_warn(msg: str) -> None:
-    print(colored("[!] {}".format(msg), "yellow"), file=sys.stderr)
+    print(colored(f"[!] {msg}", "yellow"), file=sys.stderr)
 
 
 def log_error(msg: str) -> None:
-    print(colored("[x] {}".format(msg), "red"), file=sys.stderr)
+    print(colored(f"[x] {msg}", "red"), file=sys.stderr)
 
 
 def normalize_url(base: str) -> str:
@@ -229,7 +227,7 @@ def write_output(findings: List[dict], fmt: str, stdout: bool = False, output_fi
     if output_file and output_file != "-":
         with open(output_file, "w", encoding="utf-8") as fout:
             fout.write(payload)
-        log_info("Resultados guardados en {}".format(output_file))
+        log_info(f"Resultados guardados en {output_file}")
 
 
 def discover_urls(start_url: str, max_depth: int = 1, timeout: int = 10) -> List[str]:
@@ -251,7 +249,7 @@ def discover_urls(start_url: str, max_depth: int = 1, timeout: int = 10) -> List
         try:
             resp = session.get(current, timeout=timeout, verify=True)
         except requests.RequestException as e:
-            log_warn("Error al solicitar {}: {}".format(current, e))
+            log_warn(f"Error al solicitar {current}: {e}")
             continue
 
         try:
@@ -390,9 +388,9 @@ def check_xss(session: requests.Session, url: str, timeout: int) -> List[dict]:
             severity, note = _XSS_REFLECTION_INFO[reflection]
             context = _detect_xss_context(r.text, payload) if reflection == "unescaped" else "unknown"
             if reflection == "unescaped":
-                log_warn("Posible XSS en {} param '{}' -> '{}' [{}]".format(url, p, payload, context))
+                log_warn(f"Posible XSS en {url} param '{p}' -> '{payload}' [{context}]")
             else:
-                log_info("Reflejo XSS ({}) en {} param '{}'".format(reflection, url, p))
+                log_info(f"Reflejo XSS ({reflection}) en {url} param '{p}'")
             findings.append({
                 "type": "xss", "url": url,
                 "parameter": p, "payload": payload,
@@ -408,7 +406,11 @@ def check_xss(session: requests.Session, url: str, timeout: int) -> List[dict]:
 
 _SQLI_HIT_INFO = {
     "error_kw": ("high", "keyword de error SQL en la respuesta"),
-    "status_size": ("low", "status y tamano de respuesta cambiaron a la vez respecto al baseline - revisar manualmente, puede ser contenido dinamico"),
+    "status_size": (
+        "low",
+        "status y tamano de respuesta cambiaron a la vez respecto al baseline"
+        " - revisar manualmente, puede ser contenido dinamico",
+    ),
 }
 
 
@@ -462,10 +464,10 @@ def extract_forms(session: requests.Session, url: str, timeout: int = 20) -> Lis
                     inputs[name] = tag.get("type", "text")
             if inputs:
                 forms.append({"url": action, "method": method, "inputs": inputs})
-        log_info("Formularios encontrados: {}".format(len(forms)))
+        log_info(f"Formularios encontrados: {len(forms)}")
         return forms
     except requests.RequestException as e:
-        log_error("Error al extraer formularios: {}".format(e))
+        log_error(f"Error al extraer formularios: {e}")
         return []
 
 
@@ -491,7 +493,7 @@ def check_sqli(session: requests.Session, url: str, timeout: int) -> List[dict]:
             hit = _sqli_hit(r, baseline)
             if hit:
                 severity, note = _SQLI_HIT_INFO[hit]
-                log_warn("Posible SQLi (GET) en {} param '{}' -> '{}' [{}]".format(url, p, payload, hit))
+                log_warn(f"Posible SQLi (GET) en {url} param '{p}' -> '{payload}' [{hit}]")
                 findings.append({
                     "type": "sqli_get", "url": url,
                     "parameter": p, "payload": payload,
@@ -526,7 +528,7 @@ def check_sqli(session: requests.Session, url: str, timeout: int) -> List[dict]:
                 hit = _sqli_hit(r, form_baseline)
                 if hit:
                     severity, note = _SQLI_HIT_INFO[hit]
-                    log_warn("Posible SQLi (POST) en {} campo '{}' [{}]".format(form_url, input_name, hit))
+                    log_warn(f"Posible SQLi (POST) en {form_url} campo '{input_name}' [{hit}]")
                     findings.append({
                         "type": "sqli_post", "url": form_url,
                         "parameter": input_name, "payload": payload,
@@ -544,7 +546,7 @@ def check_headers(session: requests.Session, url: str, timeout: int) -> List[dic
     try:
         r = session.get(url, timeout=timeout, verify=True)
     except requests.RequestException as e:
-        log_warn("No se pudieron verificar cabeceras en {}: {}".format(url, e))
+        log_warn(f"No se pudieron verificar cabeceras en {url}: {e}")
         return []
     missing = [h for h in SECURITY_HEADERS if h not in r.headers]
     if missing:
@@ -561,7 +563,7 @@ def detect_waf(url: str) -> Optional[str]:
         output = result.stdout or ""
         if "is behind" in output:
             waf = output.split("is behind")[-1].strip().splitlines()[0]
-            log_warn("WAF detectado: {}".format(waf))
+            log_warn(f"WAF detectado: {waf}")
             return waf
         log_info("No se detecto WAF reconocible.")
         return None
@@ -569,7 +571,7 @@ def detect_waf(url: str) -> Optional[str]:
         log_error("wafw00f no instalado: pip install wafw00f")
         return None
     except Exception as e:
-        log_error("Error al ejecutar wafw00f: {}".format(e))
+        log_error(f"Error al ejecutar wafw00f: {e}")
         return None
 
 
@@ -579,7 +581,7 @@ def get_waf_payloads(waf: Optional[str]) -> List[str]:
         return base
     for key, payloads in WAF_XSS_PAYLOADS.items():
         if key in waf.lower():
-            log_info("Usando payloads especificos para {}.".format(key))
+            log_info(f"Usando payloads especificos para {key}.")
             return payloads + base
     return base
 
@@ -605,7 +607,7 @@ def check_waf_xss(url: str, timeout: int) -> List[dict]:
                 except requests.RequestException:
                     continue
                 if payload in r.text:
-                    log_warn("[WAF-XSS] XSS en '{}' -> {}...".format(p, payload[:60]))
+                    log_warn(f"[WAF-XSS] XSS en '{p}' -> {payload[:60]}...")
                     findings.append({
                         "type": "waf_xss", "url": url,
                         "parameter": p, "payload": payload,
@@ -630,7 +632,7 @@ def check_waf_xss(url: str, timeout: int) -> List[dict]:
                 except requests.RequestException:
                     continue
                 if payload in r.text:
-                    log_warn("[WAF-XSS] XSS en form '{}' campo '{}'".format(form_url, input_name))
+                    log_warn(f"[WAF-XSS] XSS en form '{form_url}' campo '{input_name}'")
                     findings.append({
                         "type": "waf_xss_form", "url": form_url,
                         "parameter": input_name, "payload": payload,
@@ -664,7 +666,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stdout", action="store_true",
                         help="Enviar findings normalizados a stdout")
     parser.add_argument("-v", "--version", action="version",
-                        version="webxray {}".format(__version__))
+                        version=f"webxray {__version__}")
     return parser.parse_args()
 
 
@@ -678,9 +680,9 @@ def main() -> None:
     if args.waf_xss:
         all_findings.extend(check_waf_xss(start_url, timeout=timeout))
     else:
-        log_info("Descubriendo URLs desde {} (profundidad {})".format(start_url, args.depth))
+        log_info(f"Descubriendo URLs desde {start_url} (profundidad {args.depth})")
         urls = discover_urls(start_url, max_depth=args.depth, timeout=timeout)
-        log_info("URLs descubiertas: {}".format(len(urls)))
+        log_info(f"URLs descubiertas: {len(urls)}")
 
         session = requests.Session()
         session.headers.update(DEFAULT_HEADERS)
@@ -693,7 +695,7 @@ def main() -> None:
             if not args.no_headers:
                 all_findings.extend(check_headers(session, u, timeout=timeout))
 
-    log_info("Escaneo completado. Hallazgos: {}".format(len(all_findings)))
+    log_info(f"Escaneo completado. Hallazgos: {len(all_findings)}")
 
     resumen: Dict[str, int] = {}
     for finding in all_findings:
@@ -701,7 +703,7 @@ def main() -> None:
     if resumen:
         log_info("Resumen por tipo:")
         for tipo, count in resumen.items():
-            print("  - {}: {}".format(tipo, count), file=sys.stderr)
+            print(f"  - {tipo}: {count}", file=sys.stderr)
     else:
         log_info("Sin hallazgos con las heuristicas usadas.")
 
@@ -716,7 +718,7 @@ def main() -> None:
                 output_file=args.json_output,
             )
         except OSError as e:
-            log_error("No se pudo escribir salida: {}".format(e))
+            log_error(f"No se pudo escribir salida: {e}")
 
 
 if __name__ == "__main__":
