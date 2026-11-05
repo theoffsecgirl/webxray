@@ -19,6 +19,7 @@ Offensive web scanner written in Python that combines crawling, XSS detection, S
 - SQLi detection via GET and POST forms
 - Security header analysis
 - WAF detection and bypass (`--waf-xss`)
+- Custom headers (`-H`), cookies (`-c`), proxy (`-x`, Burp), `-k` and `--rate` req/s limit
 - JSON / JSONL output
 
 ---
@@ -37,13 +38,21 @@ pip install -e .
 
 ```bash
 webxray -u https://example.com
+
+# Bug bounty: identifying header, authenticated session, rate limit
+webxray -u https://target.com -H "X-Bugbounty: myuser" -c "session=..." --rate 5
+
+# Through Burp
+webxray -u https://target.com -x http://127.0.0.1:8080 -k
 ```
 
 ### Pipeline
 
 ```bash
-webxray -u https://target.com --format jsonl --stdout | bbcopilot ingest webxray -
+webxray -u https://target.com --format jsonl --stdout | jq 'select(.severity=="high")'
 ```
+
+> `-H`, `-c`, `-x`, `-k` and `--rate` apply to every request webxray sends (crawler included). In `--waf-xss` mode, WAF detection is done by `wafw00f`, which does not receive them.
 
 ---
 
