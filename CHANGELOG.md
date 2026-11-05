@@ -4,6 +4,18 @@ All notable changes to **webxray** are documented here.
 
 ---
 
+## [1.3.0] – 2026-11-05
+
+### Added
+- Opciones para bug bounty, aplicadas a todas las peticiones (crawler, XSS, SQLi, cabeceras y `--waf-xss`): `-H/--header` (repetible), `-c/--cookie`, `-x/--proxy` (Burp), `-k/--insecure` y `--rate` (máximo de peticiones por segundo, compartido entre sesiones).
+- Tests (`pytest`) contra un servidor HTTP local: llegada de cabeceras y cookies, límite de peticiones, `-k` y detección de XSS escapado/sin escapar. La CI los ejecuta.
+
+### Changed
+- Las sesiones HTTP se crean en un único punto (`make_session()`), en vez de en cuatro sitios distintos.
+- README: el ejemplo de pipeline ya no depende de una herramienta privada.
+
+---
+
 ## [1.2.0] – 2026-08-23
 
 ### Fixed

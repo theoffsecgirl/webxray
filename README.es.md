@@ -56,6 +56,12 @@ python3 webxray.py -u https://example.com -d 2
 # Con bypass WAF
 python3 webxray.py -u https://example.com --waf-xss
 
+# Bug bounty: cabecera identificativa, sesión autenticada y límite de peticiones
+python3 webxray.py -u https://target.com -H "X-Bugbounty: miusuario" -c "session=..." --rate 5
+
+# A través de Burp
+python3 webxray.py -u https://target.com -x http://127.0.0.1:8080 -k
+
 # Exportar resultados
 python3 webxray.py -u https://example.com --json-output resultados.json
 
@@ -75,11 +81,18 @@ python3 webxray.py --version
 --no-headers       Omitir cabeceras
 --waf-xss          Modo WAF + XSS avanzado (requiere wafw00f)
 -t, --timeout      Timeout en segundos (default: 10)
+-H, --header       Cabecera extra, repetible ('Nombre: valor')
+-c, --cookie       Cookies para zonas autenticadas
+-x, --proxy        Proxy HTTP(S), p. ej. Burp
+-k, --insecure     No verificar TLS
+--rate             Máximo de peticiones por segundo
 --json-output      Guardar resultados en JSON/JSONL
 --format           Formato de salida para export y stdout (json|jsonl)
 --stdout           Enviar findings normalizados a stdout
     --version      Muestra la versión
 ```
+
+> `-H`, `-c`, `-x`, `-k` y `--rate` se aplican a todas las peticiones de webxray, crawler incluido. En `--waf-xss`, la detección del WAF la hace `wafw00f`, que no las recibe.
 
 ---
 

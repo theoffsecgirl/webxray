@@ -11,7 +11,7 @@
 Pensado para recon / bug bounty como primer filtro rapido.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import argparse
 import json
@@ -20,6 +20,7 @@ import signal
 import string
 import subprocess
 import sys
+import time
 from html import escape as html_escape
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
@@ -105,6 +106,57 @@ WAF_XSS_PAYLOADS: Dict[str, List[str]] = {
         "<button onClick='prompt(1337)'>Submit</button>",
     ],
 }
+
+
+class ScanSession(requests.Session):
+    """Session con las opciones globales del escaneo (cabeceras, cookies,
+    proxy, TLS y limite de peticiones/segundo compartido entre sesiones).
+    Fuerza `verify` para que el `verify=True` de cada llamada no ignore -k."""
+
+    verify_tls: bool = True
+    min_interval: float = 0.0
+    _last_request: float = 0.0
+
+    def request(self, method, url, *args, **kwargs):  # type: ignore[override]
+        kwargs["verify"] = ScanSession.verify_tls
+        if ScanSession.min_interval > 0:
+            wait = ScanSession._last_request + ScanSession.min_interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            ScanSession._last_request = time.monotonic()
+        return super().request(method, url, *args, **kwargs)
+
+
+SCAN_HEADERS: Dict[str, str] = {}
+SCAN_PROXIES: Optional[Dict[str, str]] = None
+
+
+def make_session() -> requests.Session:
+    session = ScanSession()
+    session.headers.update(DEFAULT_HEADERS)
+    session.headers.update(SCAN_HEADERS)
+    if SCAN_PROXIES:
+        session.proxies.update(SCAN_PROXIES)
+    return session
+
+
+def configure_http(headers: List[str], cookie: Optional[str], proxy: Optional[str],
+                   insecure: bool, rate: float) -> None:
+    global SCAN_PROXIES
+    for raw in headers:
+        if ":" not in raw:
+            log_error(f"Cabecera invalida (usa 'Nombre: valor'): {raw}")
+            sys.exit(2)
+        k, v = raw.split(":", 1)
+        SCAN_HEADERS[k.strip()] = v.strip()
+    if cookie:
+        SCAN_HEADERS["Cookie"] = cookie
+    if proxy:
+        SCAN_PROXIES = {"http": proxy, "https": proxy}
+    ScanSession.verify_tls = not insecure
+    if insecure:
+        requests.packages.urllib3.disable_warnings()  # type: ignore[attr-defined]
+    ScanSession.min_interval = 1.0 / rate if rate > 0 else 0.0
 
 
 def signal_handler(sig, frame):  # type: ignore
@@ -236,8 +288,7 @@ def discover_urls(start_url: str, max_depth: int = 1, timeout: int = 10) -> List
     queue = [(start_url, 0)]
     discovered: List[str] = []
 
-    session = requests.Session()
-    session.headers.update(DEFAULT_HEADERS)
+    session = make_session()
 
     while queue:
         current, depth = queue.pop(0)
@@ -595,8 +646,7 @@ def check_waf_xss(url: str, timeout: int) -> List[dict]:
 
     params = extract_params(url)
     if params:
-        session = requests.Session()
-        session.headers.update(DEFAULT_HEADERS)
+        session = make_session()
         for p in params:
             for payload in payloads:
                 mutated = mutate_url_with_payload(url, p, payload)
@@ -615,8 +665,7 @@ def check_waf_xss(url: str, timeout: int) -> List[dict]:
                     })
                     break
 
-    session = requests.Session()
-    session.headers.update(DEFAULT_HEADERS)
+    session = make_session()
     forms = extract_forms(session, url, timeout=timeout)
     for form in forms:
         form_url = form["url"]
@@ -660,6 +709,13 @@ def parse_args() -> argparse.Namespace:
                         help="Modo WAF + XSS avanzado (requiere wafw00f)")
     parser.add_argument("-t", "--timeout", type=int, default=10,
                         help="Timeout en segundos (default: 10)")
+    parser.add_argument("-H", "--header", action="append", default=[],
+                        help="Cabecera extra, repetible (ej: 'X-Bugbounty: user', 'Authorization: Bearer x')")
+    parser.add_argument("-c", "--cookie", help="Cookies para zonas autenticadas ('a=1; b=2')")
+    parser.add_argument("-x", "--proxy", help="Proxy HTTP(S), ej: http://127.0.0.1:8080 (Burp)")
+    parser.add_argument("-k", "--insecure", action="store_true", help="No verificar TLS (util con Burp)")
+    parser.add_argument("--rate", type=float, default=0,
+                        help="Maximo de peticiones por segundo (default: sin limite)")
     parser.add_argument("--json-output", help="Guardar resultados en JSON/JSONL")
     parser.add_argument("--format", choices=["json", "jsonl"], default="json",
                         help="Formato de salida para export y stdout")
@@ -672,6 +728,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    configure_http(args.header, args.cookie, args.proxy, args.insecure, args.rate)
 
     start_url = normalize_url(args.url)
     timeout = args.timeout
@@ -684,8 +741,7 @@ def main() -> None:
         urls = discover_urls(start_url, max_depth=args.depth, timeout=timeout)
         log_info(f"URLs descubiertas: {len(urls)}")
 
-        session = requests.Session()
-        session.headers.update(DEFAULT_HEADERS)
+        session = make_session()
 
         for u in tqdm(urls, desc="Escaneando", unit="url", file=sys.stderr):
             if not args.no_xss:
